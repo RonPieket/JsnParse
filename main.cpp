@@ -1,17 +1,38 @@
-//
-//  main.cpp
-//  JsonParse
-//
-//  Created by Ronald Pieket on 4/10/13.
-//  Copyright (c) 2013 It Should Just Work!™. All rights reserved.
-//
+/*
+ Copyright (c) 2013, Insomniac Games
+
+ All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ following conditions are met:
+ - Redistributions of source code must retain the above copyright notice, this list of conditions and the
+ following disclaimer.
+ - Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ following disclaimer in the documentation and/or other materials provided with the distribution.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/**
+ \file
+ \author Ron Pieket \n<http://www.ItShouldJustWorkTM.com> \n<http://twitter.com/RonPieket>
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
-#include "JsonByoc.h"
+#include "ByteStream.h"
+#include "JsonParse.h"
 
-static const char* NewCString( const JsonByoc::Fragment& fragment )
+// -----------------------------------------------------------------------------------------------------
+
+static const char* NewCString( const JsonFragment& fragment )
 {
   size_t len = fragment.m_Length;
   char* s = NULL;
@@ -24,11 +45,13 @@ static const char* NewCString( const JsonByoc::Fragment& fragment )
   return s;
 }
 
-class JsonByocExample final : public JsonByoc
+// -----------------------------------------------------------------------------------------------------
+
+class JsonetteExample final : public JsonHandler
 {
   struct Value
   {
-    Value( const JsonByoc::Fragment& name, const JsonByoc::Fragment& value )
+    Value( const JsonFragment& name, const JsonFragment& value )
     {
       m_Next = NULL;
       m_Child = NULL;
@@ -36,14 +59,14 @@ class JsonByocExample final : public JsonByoc
       m_Name = NewCString( name );
       switch( m_Type )
       {
-        case JsonByoc::kInt:
+        case kJson_Int:
           m_Value.i = value.AsInt();
           break;
-        case JsonByoc::kFloat:
+        case kJson_Float:
           m_Value.f = value.AsFloat();
           break;
         default:
-          m_Value.s = NewCString( value );
+          m_Value.s = NewCString( value );  // Add unescaping here
           break;
       }
     }
@@ -51,14 +74,9 @@ class JsonByocExample final : public JsonByoc
     ~Value()
     {
       delete[] m_Name;
-      switch( m_Type )
+      if( m_Type != kJson_Int && m_Type != kJson_Float )
       {
-        case JsonByoc::kInt:
-        case JsonByoc::kFloat:
-          break;
-        default:
-          delete[] m_Value.s;
-          break;
+        delete[] m_Value.s;
       }
     }
 
@@ -71,9 +89,9 @@ class JsonByocExample final : public JsonByoc
     }           m_Value;
     Value*      m_Next;
     Value*      m_Child;
-    Type        m_Type;
+    JsonType        m_Type;
 
-    void Write( JsonByoc* writer ) const;
+    void Write( JsonHandler* writer ) const;
   };
 
   Value* m_Value;
@@ -81,7 +99,7 @@ class JsonByocExample final : public JsonByoc
 
 public:
 
-  JsonByocExample( Value* parent_value = NULL )
+  JsonetteExample( Value* parent_value = NULL )
   {
     m_Value = parent_value;
     m_LastChild = NULL;
@@ -93,49 +111,41 @@ public:
   }
 
   // Implementation of interface:
-  virtual void AddProperty( const Fragment& name, const Fragment& value ) override
+  virtual void AddProperty( const JsonFragment& name, const JsonFragment& value ) override
   {
     Add( name, value );
   }
 
-  virtual JsonByoc* BeginObject( const Fragment& name ) override
+  virtual JsonHandler* BeginObject( const JsonFragment& name ) override
   {
-    Add( name, Fragment( JsonByoc::kObject ) );
-    return new JsonByocExample( m_LastChild );
+    Add( name, JsonFragment( kJson_Object ) );
+    return new JsonetteExample( m_LastChild );
   }
 
-  virtual void EndObject( JsonByoc* byoc ) override
+  virtual void EndObject( JsonHandler* byoc ) override
   {
     delete byoc;
   }
 
-  virtual JsonByoc* BeginArray( const Fragment& name ) override
+  virtual JsonHandler* BeginArray( const JsonFragment& name ) override
   {
-    Add( name, Fragment( JsonByoc::kArray ) );
-    return new JsonByocExample( m_LastChild );
+    Add( name, JsonFragment( kJson_Array ) );
+    return new JsonetteExample( m_LastChild );
   }
 
-  virtual void EndArray( JsonByoc* byoc ) override
+  virtual void EndArray( JsonHandler* byoc ) override
   {
     delete byoc;
-  }
-
-  virtual void Error( const char* message, const char* p ) override
-  {
-    char buf[ 50 ];
-    strncpy( buf, p, sizeof( buf ) );
-    buf[ sizeof( buf ) - 1 ] = '\0';
-    printf( "%s here:\n%s\n", message, buf );
   }
 
 private:
 
-  void Add( const Fragment& name, const Fragment& value )
+  void Add( const JsonFragment& name, const JsonFragment& value )
   {
-    Add( new JsonByocExample::Value( name, value ) );
+    Add( new JsonetteExample::Value( name, value ) );
   }
 
-  void Add( JsonByocExample::Value* value )
+  void Add( JsonetteExample::Value* value )
   {
     if( m_LastChild )
     {
@@ -149,39 +159,40 @@ private:
   }
 };
 
+// -----------------------------------------------------------------------------------------------------
 
-void JsonByocExample::Value::Write( JsonByoc* writer ) const
+void JsonetteExample::Value::Write( JsonHandler* writer ) const
 {
   switch( m_Type )
   {
-    case JsonByoc::kNull:
-    case JsonByoc::kTrue:
-    case JsonByoc::kFalse:
+    case kJson_Null:
+    case kJson_True:
+    case kJson_False:
       writer->AddProperty( m_Name, m_Type );
       break;
 
-    case JsonByoc::kString:
-      writer->AddProperty( m_Name, JsonByoc::Fragment( JsonByoc::kString, m_Value.s ) );
+    case kJson_String:
+      writer->AddProperty( m_Name, JsonFragment( kJson_String, m_Value.s ) );
       break;
 
-    case JsonByoc::kInt:
+    case kJson_Int:
     {
       char buf[ 25 ];
-      writer->AddProperty( m_Name, JsonByoc::Fragment().FromInt( buf, m_Value.i ) );
+      writer->AddProperty( m_Name, JsonFragment().FromInt( buf, m_Value.i ) );
       break;
     }
 
-    case JsonByoc::kFloat:
+    case kJson_Float:
     {
       char buf[ 25 ];
-      writer->AddProperty( m_Name, JsonByoc::Fragment().FromFloat( buf, m_Value.f ) );
+      writer->AddProperty( m_Name, JsonFragment().FromFloat( buf, m_Value.f ) );
       break;
     }
 
-    case kObject:
+    case kJson_Object:
     {
-      JsonByoc* child_writer = writer->BeginObject( m_Name );
-      for( JsonByocExample::Value* child = m_Child; child; child = child->m_Next )
+      JsonHandler* child_writer = writer->BeginObject( m_Name );
+      for( JsonetteExample::Value* child = m_Child; child; child = child->m_Next )
       {
         child->Write( child_writer );
       }
@@ -189,10 +200,10 @@ void JsonByocExample::Value::Write( JsonByoc* writer ) const
       break;
     }
 
-    case kArray:
+    case kJson_Array:
     {
-      JsonByoc* child_writer = writer->BeginArray( m_Name );
-      for( JsonByocExample::Value* child = m_Child; child; child = child->m_Next )
+      JsonHandler* child_writer = writer->BeginArray( m_Name );
+      for( JsonetteExample::Value* child = m_Child; child; child = child->m_Next )
       {
         child->Write( child_writer );
       }
@@ -205,8 +216,16 @@ void JsonByocExample::Value::Write( JsonByoc* writer ) const
   }
 }
 
+// -----------------------------------------------------------------------------------------------------
+
 char json_text[] =
   "{" \
+  " \"ctrl_chars\": \" \\\" \\\\ \\/ \\b \\f \\n \\r \\t \"," \
+  " \"escaped_ctrl_chars\": \" \\\\/ \\\\b \\\\f \\\\n \\\\r \\\\t \"," \
+  " \"bogus_ctrl_chars\": \" \\x \\y \\z \"," \
+  " \"escaped_bogus_ctrl_chars\": \" \\\\x \\\\y \\\\z \"," \
+  " \"unicode_escaped\": \"Copyright:\\u00A9 Notes:\\u266B Clef:\\uD834\\uDD1E\"," \
+  " \"unicode_unescaped\": \"Copyright:© Notes:♫ Clef:𝄞\"," \
   " \"string\": \"hello\"," \
   " \"int\": 100," \
   " \"float\": 3.141592," \
@@ -222,30 +241,54 @@ char json_text[] =
   " \"empty_array\": []" \
   "}";
 
+// -----------------------------------------------------------------------------------------------------
+
 int main(int argc, const char * argv[])
 {
-  JsonByocExample example_reader;
-  JsonWriter writer( "", "" );
+  printf( "%s\n", json_text );
+
+  JsonetteExample example_reader;
 
   printf( "\n\n--------- read into own format, then write\n\n" );
-  if( JsonParse( &example_reader, json_text ) )
+  ByteStreamIn read_stream( json_text );
+  if( !JsonParse( &example_reader, &read_stream ) )
   {
-    writer.SetMode( JsonWriter::kCount );
+    printf( "ERROR: %s\n", read_stream.error );
+    char buf[ 50 ];
+    size_t len = sizeof( buf );
+    strncpy( buf, read_stream.data + read_stream.index, len );
+    buf[ len - 1 ] = 0;
+    printf( "%s\n", buf );
+  }
+  else
+  {
+    ByteStreamOut write_stream;
+    JsonWriter::Style style;
+    style.m_EscapeUTF8 = false;
+    style.m_IndentLevelString = "";
+    style.m_NewlineString = "";
+    style.m_SpaceAfterColonString = "";
+
+    JsonWriter writer( &write_stream, &style );
     example_reader.GetValue()->Write( &writer );
-    size_t count = writer.GetCount();
+
+    size_t count = write_stream.index;
     printf( "COUNT %d\n", ( int )count );
     char* buffer = new char[ count + 1 ]; // +1 for zero termination
     buffer[ count ] = '\0';
-    writer.SetMode( JsonWriter::kWrite, buffer );
+    write_stream = ByteStreamOut( buffer, count );
     example_reader.GetValue()->Write( &writer );
     printf( "%s\n", buffer );
     delete[] buffer;
   }
-
+/*
   printf( "\n\n--------- read directly into writer (for fun, because we can)\n\n" );
-  writer.SetMode( JsonWriter::kPrint );
-  JsonParse( &writer, json_text );
+  writer.SetModePrint();
+  read_stream.Reset();
+  JsonParse( &writer, &read_stream );
+ */
 
   return 0;
 }
 
+// -----------------------------------------------------------------------------------------------------
