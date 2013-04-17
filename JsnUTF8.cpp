@@ -23,15 +23,15 @@
  \author Ron Pieket \n<http://www.ItShouldJustWorkTM.com> \n<http://twitter.com/RonPieket>
  */
 
-#include "ByteStream.h"
-#include "EscapeUTF8.h"
+#include "JsnStream.h"
+#include "JsnUTF8.h"
 
 #include <stdint.h>
 
 // *****************************************************************************************************
 // Section: read individual unicode characters
 
-static int ReadEscapedUTF8Hex4( ByteStreamIn* stream )
+static int ReadEscapedUTF8Hex4( JsnStreamIn* stream )
 {
   int result = 0;
   int c = stream->Read();
@@ -70,7 +70,7 @@ static int ReadEscapedUTF8Hex4( ByteStreamIn* stream )
 
 // -----------------------------------------------------------------------------------------------------
 
-int ReadEscapedUTF8Char( ByteStreamIn* stream )
+int JsnReadEscapedUTF8Char( JsnStreamIn* stream )
 {
   int result = ReadEscapedUTF8Hex4( stream );
   if( result >= 0xD800 && result <= 0xDBFF )
@@ -87,7 +87,7 @@ int ReadEscapedUTF8Char( ByteStreamIn* stream )
 
 // -----------------------------------------------------------------------------------------------------
 
-int ReadUnescapedUTF8Char( ByteStreamIn* stream )
+int JsnReadUnescapedUTF8Char( JsnStreamIn* stream )
 {
   int result = 0;
   int c = stream->Read();
@@ -160,7 +160,7 @@ int ReadUnescapedUTF8Char( ByteStreamIn* stream )
 // *****************************************************************************************************
 // Section: write individual unicode characters
 
-static void WriteEscapedUTF8Hex4( ByteStreamOut* stream, int code16 )
+static void WriteEscapedUTF8Hex4( JsnStreamOut* stream, int code16 )
 {
   stream->Write( '\\' );
   stream->Write( 'u' );
@@ -173,7 +173,7 @@ static void WriteEscapedUTF8Hex4( ByteStreamOut* stream, int code16 )
 
 // -----------------------------------------------------------------------------------------------------
 
-void WriteEscapedUTF8Char( ByteStreamOut* stream, int codepoint )
+void JsnWriteEscapedUTF8Char( JsnStreamOut* stream, int codepoint )
 {
   if( codepoint >= 0x10000 )
   {
@@ -189,7 +189,7 @@ void WriteEscapedUTF8Char( ByteStreamOut* stream, int codepoint )
 
 // -----------------------------------------------------------------------------------------------------
 
-void WriteUnescapedUTF8Char( ByteStreamOut* stream, int codepoint )
+void JsnWriteUnescapedUTF8Char( JsnStreamOut* stream, int codepoint )
 {
   if( codepoint < 0x80 )
   {
@@ -222,7 +222,7 @@ void WriteUnescapedUTF8Char( ByteStreamOut* stream, int codepoint )
 // *****************************************************************************************************
 // Section: converting strings
 
-void UnescapeUTF8( ByteStreamOut* write_stream, ByteStreamIn* read_stream )
+void JsnUnescapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream )
 {
   while( !read_stream->error && !write_stream->error && read_stream->Peek() )
   {
@@ -231,7 +231,7 @@ void UnescapeUTF8( ByteStreamOut* write_stream, ByteStreamIn* read_stream )
     int c1 = read_stream->Peek( 1 );
     if( c0 == '\\' && ( c1 == 'u' || c1 == 'U' ) )
     {
-      codepoint = ReadEscapedUTF8Char( read_stream );
+      codepoint = JsnReadEscapedUTF8Char( read_stream );
     }
     else
     {
@@ -239,7 +239,7 @@ void UnescapeUTF8( ByteStreamOut* write_stream, ByteStreamIn* read_stream )
     }
     if( !read_stream->error )
     {
-      WriteUnescapedUTF8Char( write_stream, codepoint );
+      JsnWriteUnescapedUTF8Char( write_stream, codepoint );
     }
   }
   write_stream->Write( 0 );
@@ -247,11 +247,11 @@ void UnescapeUTF8( ByteStreamOut* write_stream, ByteStreamIn* read_stream )
 
 // -----------------------------------------------------------------------------------------------------
 
-void EscapeUTF8( ByteStreamOut* write_stream, ByteStreamIn* read_stream )
+void JsnEscapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream )
 {
   while( !read_stream->error && !write_stream->error && read_stream->Peek() )
   {
-    int codepoint = ReadUnescapedUTF8Char( read_stream );
+    int codepoint = JsnReadUnescapedUTF8Char( read_stream );
     if( !read_stream->error )
     {
       if( codepoint < 0x80 )
@@ -260,7 +260,7 @@ void EscapeUTF8( ByteStreamOut* write_stream, ByteStreamIn* read_stream )
       }
       else
       {
-        WriteEscapedUTF8Char( write_stream, codepoint );
+        JsnWriteEscapedUTF8Char( write_stream, codepoint );
       }
     }
   }

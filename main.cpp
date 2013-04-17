@@ -27,58 +27,17 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "ByteStream.h"
-#include "JsonParse.h"
+#include "JsnStream.h"
+#include "JsnParse.h"
 
 // -----------------------------------------------------------------------------------------------------
 
-static const char* NewCString( const JsonFragment& fragment )
-{
-  size_t len = fragment.m_Length;
-  char* s = NULL;
-  if( len )
-  {
-    s = new char[ len + 1 ];
-    memcpy( s, fragment.m_Text, len );
-    s[ len ] = '\0';
-  }
-  return s;
-}
-
-// -----------------------------------------------------------------------------------------------------
-
-class JsonetteExample final : public JsonHandler
+class JsnExample final : public JsnHandler
 {
   struct Value
   {
-    Value( const JsonFragment& name, const JsonFragment& value )
-    {
-      m_Next = NULL;
-      m_Child = NULL;
-      m_Type = value.m_Type;
-      m_Name = NewCString( name );
-      switch( m_Type )
-      {
-        case kJson_Int:
-          m_Value.i = value.AsInt();
-          break;
-        case kJson_Float:
-          m_Value.f = value.AsFloat();
-          break;
-        default:
-          m_Value.s = NewCString( value );  // Add unescaping here
-          break;
-      }
-    }
-
-    ~Value()
-    {
-      delete[] m_Name;
-      if( m_Type != kJson_Int && m_Type != kJson_Float )
-      {
-        delete[] m_Value.s;
-      }
-    }
+    Value( const JsnFragment& name, const JsnFragment& value );
+    ~Value();
 
     const char* m_Name;
     union
@@ -86,12 +45,12 @@ class JsonetteExample final : public JsonHandler
       const char* s;
       double      f;
       int64_t     i;
-    }           m_Value;
-    Value*      m_Next;
-    Value*      m_Child;
-    JsonType        m_Type;
+    }             m_Value;
+    Value*        m_Next;
+    Value*        m_Child;
+    JsnType       m_Type;
 
-    void Write( JsonHandler* writer ) const;
+    void Write( JsnHandler* writer ) const;
   };
 
   Value* m_Value;
@@ -99,7 +58,7 @@ class JsonetteExample final : public JsonHandler
 
 public:
 
-  JsonetteExample( Value* parent_value = NULL )
+  JsnExample( Value* parent_value = NULL )
   {
     m_Value = parent_value;
     m_LastChild = NULL;
@@ -111,41 +70,41 @@ public:
   }
 
   // Implementation of interface:
-  virtual void AddProperty( const JsonFragment& name, const JsonFragment& value ) override
+  virtual void AddProperty( const JsnFragment& name, const JsnFragment& value ) override
   {
     Add( name, value );
   }
 
-  virtual JsonHandler* BeginObject( const JsonFragment& name ) override
+  virtual JsnHandler* BeginObject( const JsnFragment& name ) override
   {
-    Add( name, JsonFragment( kJson_Object ) );
-    return new JsonetteExample( m_LastChild );
+    Add( name, JsnFragment( kJsn_Object ) );
+    return new JsnExample( m_LastChild );
   }
 
-  virtual void EndObject( JsonHandler* byoc ) override
+  virtual void EndObject( JsnHandler* byoc ) override
   {
     delete byoc;
   }
 
-  virtual JsonHandler* BeginArray( const JsonFragment& name ) override
+  virtual JsnHandler* BeginArray( const JsnFragment& name ) override
   {
-    Add( name, JsonFragment( kJson_Array ) );
-    return new JsonetteExample( m_LastChild );
+    Add( name, JsnFragment( kJsn_Array ) );
+    return new JsnExample( m_LastChild );
   }
 
-  virtual void EndArray( JsonHandler* byoc ) override
+  virtual void EndArray( JsnHandler* byoc ) override
   {
     delete byoc;
   }
 
 private:
 
-  void Add( const JsonFragment& name, const JsonFragment& value )
+  void Add( const JsnFragment& name, const JsnFragment& value )
   {
-    Add( new JsonetteExample::Value( name, value ) );
+    Add( new JsnExample::Value( name, value ) );
   }
 
-  void Add( JsonetteExample::Value* value )
+  void Add( JsnExample::Value* value )
   {
     if( m_LastChild )
     {
@@ -161,38 +120,38 @@ private:
 
 // -----------------------------------------------------------------------------------------------------
 
-void JsonetteExample::Value::Write( JsonHandler* writer ) const
+void JsnExample::Value::Write( JsnHandler* writer ) const
 {
   switch( m_Type )
   {
-    case kJson_Null:
-    case kJson_True:
-    case kJson_False:
+    case kJsn_Null:
+    case kJsn_True:
+    case kJsn_False:
       writer->AddProperty( m_Name, m_Type );
       break;
 
-    case kJson_String:
-      writer->AddProperty( m_Name, JsonFragment( kJson_String, m_Value.s ) );
+    case kJsn_String:
+      writer->AddProperty( m_Name, JsnFragment( kJsn_String, m_Value.s ) );
       break;
 
-    case kJson_Int:
+    case kJsn_Int:
     {
       char buf[ 25 ];
-      writer->AddProperty( m_Name, JsonFragment().FromInt( buf, m_Value.i ) );
+      writer->AddProperty( m_Name, JsnFragment().FromInt( buf, sizeof( buf ), m_Value.i ) );
       break;
     }
 
-    case kJson_Float:
+    case kJsn_Float:
     {
       char buf[ 25 ];
-      writer->AddProperty( m_Name, JsonFragment().FromFloat( buf, m_Value.f ) );
+      writer->AddProperty( m_Name, JsnFragment().FromFloat( buf, sizeof( buf ), m_Value.f ) );
       break;
     }
 
-    case kJson_Object:
+    case kJsn_Object:
     {
-      JsonHandler* child_writer = writer->BeginObject( m_Name );
-      for( JsonetteExample::Value* child = m_Child; child; child = child->m_Next )
+      JsnHandler* child_writer = writer->BeginObject( m_Name );
+      for( JsnExample::Value* child = m_Child; child; child = child->m_Next )
       {
         child->Write( child_writer );
       }
@@ -200,10 +159,10 @@ void JsonetteExample::Value::Write( JsonHandler* writer ) const
       break;
     }
 
-    case kJson_Array:
+    case kJsn_Array:
     {
-      JsonHandler* child_writer = writer->BeginArray( m_Name );
-      for( JsonetteExample::Value* child = m_Child; child; child = child->m_Next )
+      JsnHandler* child_writer = writer->BeginArray( m_Name );
+      for( JsnExample::Value* child = m_Child; child; child = child->m_Next )
       {
         child->Write( child_writer );
       }
@@ -213,6 +172,48 @@ void JsonetteExample::Value::Write( JsonHandler* writer ) const
 
     default:
       break;
+  }
+}
+
+static const char* NewCString( const JsnFragment& fragment )
+{
+  int len = fragment.m_Length;
+  char* s = NULL;
+  if( len )
+  {
+    s = new char[ len + 1 ];
+    memcpy( s, fragment.m_Text, len );
+    s[ len ] = '\0';
+  }
+  return s;
+}
+
+JsnExample::Value::Value( const JsnFragment& name, const JsnFragment& value )
+{
+  m_Next = NULL;
+  m_Child = NULL;
+  m_Type = value.m_Type;
+  m_Name = NewCString( name );
+  switch( m_Type )
+  {
+    case kJsn_Int:
+      m_Value.i = value.AsInt();
+      break;
+    case kJsn_Float:
+      m_Value.f = value.AsFloat();
+      break;
+    default:
+      m_Value.s = NewCString( value );
+      break;
+  }
+}
+
+JsnExample::Value::~Value()
+{
+  delete[] m_Name;
+  if( m_Type != kJsn_Int && m_Type != kJsn_Float )
+  {
+    delete[] m_Value.s;
   }
 }
 
@@ -247,36 +248,36 @@ int main(int argc, const char * argv[])
 {
   printf( "%s\n", json_text );
 
-  JsonetteExample example_reader;
+  JsnExample example_reader;
 
   printf( "\n\n--------- read into own format, then write\n\n" );
-  ByteStreamIn read_stream( json_text );
-  if( !JsonParse( &example_reader, &read_stream ) )
+  JsnStreamIn read_stream( json_text );
+  if( !JsnParse( &example_reader, &read_stream ) )
   {
     printf( "ERROR: %s\n", read_stream.error );
     char buf[ 50 ];
-    size_t len = sizeof( buf );
+    int len = sizeof( buf );
     strncpy( buf, read_stream.data + read_stream.index, len );
     buf[ len - 1 ] = 0;
     printf( "%s\n", buf );
   }
   else
   {
-    ByteStreamOut write_stream;
-    JsonWriter::Style style;
+    JsnStreamOut write_stream;
+    JsnWriter::Style style;
     style.m_EscapeUTF8 = false;
-    style.m_IndentLevelString = "";
+    style.m_IndentLevel = "";
     style.m_NewlineString = "";
     style.m_SpaceAfterColonString = "";
 
-    JsonWriter writer( &write_stream, &style );
+    JsnWriter writer( &write_stream, &style );
     example_reader.GetValue()->Write( &writer );
 
-    size_t count = write_stream.index;
+    int count = write_stream.index;
     printf( "COUNT %d\n", ( int )count );
     char* buffer = new char[ count + 1 ]; // +1 for zero termination
     buffer[ count ] = '\0';
-    write_stream = ByteStreamOut( buffer, count );
+    write_stream = JsnStreamOut( buffer, count );
     example_reader.GetValue()->Write( &writer );
     printf( "%s\n", buffer );
     delete[] buffer;
@@ -285,7 +286,7 @@ int main(int argc, const char * argv[])
   printf( "\n\n--------- read directly into writer (for fun, because we can)\n\n" );
   writer.SetModePrint();
   read_stream.Reset();
-  JsonParse( &writer, &read_stream );
+  JsnParse( &writer, &read_stream );
  */
 
   return 0;

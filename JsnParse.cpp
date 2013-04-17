@@ -23,9 +23,9 @@
  \author Ron Pieket \n<http://www.ItShouldJustWorkTM.com> \n<http://twitter.com/RonPieket>
  */
 
-#include "JsonParse.h"
-#include "EscapeUTF8.h"
-#include "ByteStream.h"
+#include "JsnParse.h"
+#include "JsnUTF8.h"
+#include "JsnStream.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -51,7 +51,7 @@ static bool IsUTF8Whitespace( int codepoint )
   codepoint == 0xFEFF;
 }
 
-static void JsonEatSpace( ByteStreamIn* stream )
+static void JsnEatSpace( JsnStreamIn* stream )
 {
   while( stream->Peek() != -1 && stream->Peek() <= ' ' )
   {
@@ -59,7 +59,7 @@ static void JsonEatSpace( ByteStreamIn* stream )
   }
 }
 
-static JsonFragment ParseString( ByteStreamIn* stream )
+static JsnFragment ParseString( JsnStreamIn* stream )
 {
   stream->Read(); // Skip leading quote
   const char* begin = stream->data + stream->index;
@@ -73,10 +73,10 @@ static JsonFragment ParseString( ByteStreamIn* stream )
     c = stream->Read();
   }
   const char* end = stream->data + stream->index - 1;
-  return JsonFragment( kJson_String, begin, end - begin );
+  return JsnFragment( kJsn_String, begin, end );
 }
 
-static double TextAsFloat( const char* text, size_t length )
+static double TextAsFloat( const char* text, int length )
 {
   char buf[ 100 ];  // Could be 1000000000000000000000000000000000000000000000000000000000000
   if( length < sizeof( buf ) - 1 )
@@ -88,9 +88,9 @@ static double TextAsFloat( const char* text, size_t length )
   return 0;
 }
 
-static JsonFragment ParseNumber( ByteStreamIn* stream )
+static JsnFragment ParseNumber( JsnStreamIn* stream )
 {
-  JsonType t = kJson_Int;
+  JsnType t = kJsn_Int;
 
   const char* begin = stream->data + stream->index;
   int c = stream->Read();
@@ -106,7 +106,7 @@ static JsonFragment ParseNumber( ByteStreamIn* stream )
 
   if( c == '.' )
   {
-    t = kJson_Float;
+    t = kJsn_Float;
     c = stream->Read();
     while( c >= '0' && c <= '9' )
     {
@@ -116,7 +116,7 @@ static JsonFragment ParseNumber( ByteStreamIn* stream )
 
   if( c == 'e' || c == 'E' )
   {
-    t = kJson_Float;
+    t = kJsn_Float;
     c = stream->Read();
     if( c == '-' || c == '+' )
     {
@@ -130,24 +130,24 @@ static JsonFragment ParseNumber( ByteStreamIn* stream )
   stream->Unread();
   const char* end = stream->data + stream->index;
 
-  if( t == kJson_Int )
+  if( t == kJsn_Int )
   {
-    double f = TextAsFloat( begin, end - begin );
+    double f = TextAsFloat( begin, ( int )( end - begin ) );
     if( f > UINT64_MAX || f < INT64_MIN )
     {
-      t = kJson_Float;
+      t = kJsn_Float;
     }
   }
 
-  return JsonFragment( t, begin, end - begin );
+  return JsnFragment( t, begin, end );
 }
 
-double JsonFragment::AsFloat() const
+double JsnFragment::AsFloat() const
 {
   return TextAsFloat( m_Text, m_Length );
 }
 
-int64_t JsonFragment::AsInt() const
+int64_t JsnFragment::AsInt() const
 {
   char buf[ 25 ];
   if( m_Length < sizeof( buf ) - 1 )
@@ -159,19 +159,19 @@ int64_t JsonFragment::AsInt() const
   return 0;
 }
 
-JsonFragment JsonFragment::FromFloat( char* buf25, double value )
+JsnFragment JsnFragment::FromFloat( char* buf25, int buf_size, double value )
 {
-  snprintf( buf25, 25, "%.16g", value );
-  return JsonFragment( kJson_Float, buf25 );
+  snprintf( buf25, buf_size, "%.16g", value );
+  return JsnFragment( kJsn_Float, buf25 );
 }
 
-JsonFragment JsonFragment::FromInt( char* buf25, int64_t value )
+JsnFragment JsnFragment::FromInt( char* buf25, int buf_size, int64_t value )
 {
-  snprintf( buf25, 25, "%lld", value );
-  return JsonFragment( kJson_Int, buf25 );
+  snprintf( buf25, buf_size, "%lld", value );
+  return JsnFragment( kJsn_Int, buf25 );
 }
 
-static void ParseTrue( ByteStreamIn* stream )
+static void ParseTrue( JsnStreamIn* stream )
 {
   if( stream->Read() != 't' ||
       stream->Read() != 'r' ||
@@ -183,7 +183,7 @@ static void ParseTrue( ByteStreamIn* stream )
   }
 }
 
-static void ParseFalse( ByteStreamIn* stream )
+static void ParseFalse( JsnStreamIn* stream )
 {
   if( stream->Read() != 'f' ||
       stream->Read() != 'a' ||
@@ -196,7 +196,7 @@ static void ParseFalse( ByteStreamIn* stream )
   }
 }
 
-static void ParseNull( ByteStreamIn* stream )
+static void ParseNull( JsnStreamIn* stream )
 {
   if( stream->Read() != 'n' ||
       stream->Read() != 'u' ||
@@ -208,18 +208,18 @@ static void ParseNull( ByteStreamIn* stream )
   }
 }
 
-static void ParseValue( JsonHandler* reader, ByteStreamIn* stream, const JsonFragment& name );
+static void ParseValue( JsnHandler* reader, JsnStreamIn* stream, const JsnFragment& name );
 
-static void ParseObject( JsonHandler* reader, ByteStreamIn* stream )
+static void ParseObject( JsnHandler* reader, JsnStreamIn* stream )
 {
   do
   {
     stream->Read(); // Skip open brace or comma
-    JsonEatSpace( stream );
+    JsnEatSpace( stream );
     int c = stream->Peek();
     if( c != '}' )
     {
-      JsonFragment name;
+      JsnFragment name;
       if( c == '"' )
       {
         name = ParseString( stream );
@@ -229,19 +229,19 @@ static void ParseObject( JsonHandler* reader, ByteStreamIn* stream )
         stream->Error( "String expected" );
       }
 
-      JsonEatSpace( stream );
+      JsnEatSpace( stream );
       int c = stream->Peek();
       if( c == ':' )
       {
         stream->Read(); // Skip colon
-        JsonEatSpace( stream );
+        JsnEatSpace( stream );
         ParseValue( reader, stream, name );
       }
       else
       {
         stream->Error( "\":\" expected" );
       }
-      JsonEatSpace( stream );
+      JsnEatSpace( stream );
     }
   }
   while( !stream->error && stream->Peek() == ',' );
@@ -253,16 +253,16 @@ static void ParseObject( JsonHandler* reader, ByteStreamIn* stream )
   }
 }
 
-static void ParseArray( JsonHandler* reader, ByteStreamIn* stream )
+static void ParseArray( JsnHandler* reader, JsnStreamIn* stream )
 {
   do
   {
     stream->Read(); // Skip open bracket or comma
-    JsonEatSpace( stream );
+    JsnEatSpace( stream );
     if( stream->Peek() != ']' )
     {
-      ParseValue( reader, stream, JsonFragment() );
-      JsonEatSpace( stream );
+      ParseValue( reader, stream, JsnFragment() );
+      JsnEatSpace( stream );
     }
   }
   while( !stream->error && stream->Peek() == ',' );
@@ -274,28 +274,28 @@ static void ParseArray( JsonHandler* reader, ByteStreamIn* stream )
   }
 }
 
-static void ParseValue( JsonHandler* reader, ByteStreamIn* stream, const JsonFragment& name )
+static void ParseValue( JsnHandler* reader, JsnStreamIn* stream, const JsnFragment& name )
 {
   switch( stream->Peek() )
   {
     case 't':
       ParseTrue( stream );
-      reader->AddProperty( name, JsonFragment( kJson_True ) );
+      reader->AddProperty( name, JsnFragment( kJsn_True ) );
       break;
 
     case 'f':
       ParseFalse( stream );
-      reader->AddProperty( name, JsonFragment( kJson_False ) );
+      reader->AddProperty( name, JsnFragment( kJsn_False ) );
       break;
 
     case 'n':
       ParseNull( stream );
-      reader->AddProperty( name, JsonFragment( kJson_Null ) );
+      reader->AddProperty( name, JsnFragment( kJsn_Null ) );
       break;
 
     case '"':
     {
-      JsonFragment value = ParseString( stream );
+      JsnFragment value = ParseString( stream );
       reader->AddProperty( name, value );
       break;
     }
@@ -313,14 +313,14 @@ static void ParseValue( JsonHandler* reader, ByteStreamIn* stream, const JsonFra
     case '8':
     case '9':
     {
-      JsonFragment value = ParseNumber( stream );
+      JsnFragment value = ParseNumber( stream );
       reader->AddProperty( name, value );
       break;
     }
 
     case '[':
     {
-      JsonHandler* child_reader = reader->BeginArray( name );
+      JsnHandler* child_reader = reader->BeginArray( name );
       ParseArray( child_reader, stream );
       reader->EndArray( child_reader );
       break;
@@ -328,7 +328,7 @@ static void ParseValue( JsonHandler* reader, ByteStreamIn* stream, const JsonFra
 
     case '{':
     {
-      JsonHandler* child_reader = reader->BeginObject( name );
+      JsnHandler* child_reader = reader->BeginObject( name );
       ParseObject( child_reader, stream );
       reader->EndObject( child_reader );
       break;
@@ -340,15 +340,15 @@ static void ParseValue( JsonHandler* reader, ByteStreamIn* stream, const JsonFra
   }
 }
 
-bool JsonParse( JsonHandler* reader, ByteStreamIn* stream )
+bool JsnParse( JsnHandler* reader, JsnStreamIn* stream )
 {
-  ParseValue( reader, stream, JsonFragment() );
+  ParseValue( reader, stream, JsnFragment() );
   return !stream->error;
 }
 
-static void WriteStringChar( ByteStreamOut* write_stream, ByteStreamIn* read_stream, bool escape )
+static void WriteStringChar( JsnStreamOut* write_stream, JsnStreamIn* read_stream, bool escape )
 {
-  int codepoint1 = ReadUnescapedUTF8Char( read_stream );
+  int codepoint1 = JsnReadUnescapedUTF8Char( read_stream );
 
   if( read_stream->error )
   {
@@ -357,7 +357,7 @@ static void WriteStringChar( ByteStreamOut* write_stream, ByteStreamIn* read_str
 
   if( codepoint1 == '\\' )
   {
-    int codepoint2 = ReadUnescapedUTF8Char( read_stream );
+    int codepoint2 = JsnReadUnescapedUTF8Char( read_stream );
     switch( codepoint2 )
     {
       case '"':
@@ -407,32 +407,32 @@ static void WriteStringChar( ByteStreamOut* write_stream, ByteStreamIn* read_str
         write_stream->WriteStr( "\\t" );
         break;
       default:
-        WriteEscapedUTF8Char( write_stream, codepoint1 );
+        JsnWriteEscapedUTF8Char( write_stream, codepoint1 );
         break;
     }
   }
   else if( codepoint1 >= 0x80 && escape )
   {
-    WriteEscapedUTF8Char( write_stream, codepoint1 );
+    JsnWriteEscapedUTF8Char( write_stream, codepoint1 );
   }
   else
   {
-    WriteUnescapedUTF8Char( write_stream, codepoint1 );
+    JsnWriteUnescapedUTF8Char( write_stream, codepoint1 );
   }
 }
 
-void JsonWriter::WriteFragment( const JsonFragment& fragment )
+void JsnWriter::WriteFragment( const JsnFragment& fragment )
 {
-  ByteStreamIn read_stream( fragment.m_Text, fragment.m_Length );
+  JsnStreamIn read_stream( fragment.m_Text, fragment.m_Length );
   while( !m_Stream->error && read_stream.Peek() != -1 )
   {
     m_Stream->Write( read_stream.Read() );
   }
 }
 
-void JsonWriter::WriteFragmentString( const JsonFragment& fragment )
+void JsnWriter::WriteFragmentString( const JsnFragment& fragment )
 {
-  ByteStreamIn read_stream( fragment.m_Text, fragment.m_Length );
+  JsnStreamIn read_stream( fragment.m_Text, fragment.m_Length );
   m_Stream->Write( '"' );
   while( !read_stream.error && !m_Stream->error && read_stream.Peek() )
   {
@@ -441,15 +441,15 @@ void JsonWriter::WriteFragmentString( const JsonFragment& fragment )
   m_Stream->Write( '"' );
 }
 
-void JsonWriter::WriteIndent()
+void JsnWriter::WriteIndent()
 {
   for( int i = 0; i < m_IndentLevel; ++i )
   {
-    WriteFragment( m_Style->m_IndentLevelString );
+    WriteFragment( m_Style->m_IndentLevel );
   }
 }
 
-void JsonWriter::WriteProperty( const JsonFragment& name, const JsonFragment& value )
+void JsnWriter::WriteProperty( const JsnFragment& name, const JsnFragment& value )
 {
   if( m_IndentLevel )
   {
@@ -466,7 +466,7 @@ void JsonWriter::WriteProperty( const JsonFragment& name, const JsonFragment& va
     WriteFragment( ":" );
     WriteFragment( m_Style->m_SpaceAfterColonString );
   }
-  if( value.m_Type == kJson_String )
+  if( value.m_Type == kJsn_String )
   {
     WriteFragmentString( value );
   }
@@ -477,22 +477,22 @@ void JsonWriter::WriteProperty( const JsonFragment& name, const JsonFragment& va
   m_ValueCount += 1;
 }
 
-void JsonWriter::AddProperty( const JsonFragment& name, const JsonFragment& value )
+void JsnWriter::AddProperty( const JsnFragment& name, const JsnFragment& value )
 {
   switch( value.m_Type )
   {
-    case kJson_Int:
-    case kJson_Float:
-    case kJson_String:
+    case kJsn_Int:
+    case kJsn_Float:
+    case kJsn_String:
       WriteProperty( name, value );
       break;
-    case kJson_True:
+    case kJsn_True:
       WriteProperty( name, "true" );
       break;
-    case kJson_False:
+    case kJsn_False:
       WriteProperty( name, "false" );
       break;
-    case kJson_Null:
+    case kJsn_Null:
       WriteProperty( name, "null" );
       break;
 
@@ -501,13 +501,13 @@ void JsonWriter::AddProperty( const JsonFragment& name, const JsonFragment& valu
   }
 }
 
-JsonHandler* JsonWriter::BeginObject( const JsonFragment& name )
+JsnHandler* JsnWriter::BeginObject( const JsnFragment& name )
 {
   WriteProperty( name, "{" );
-  return new JsonWriter( *this );
+  return new JsnWriter( *this );
 }
 
-void JsonWriter::EndObject( JsonHandler* byoc )
+void JsnWriter::EndObject( JsnHandler* byoc )
 {
   WriteFragment( m_Style->m_NewlineString );
   WriteIndent();
@@ -519,13 +519,13 @@ void JsonWriter::EndObject( JsonHandler* byoc )
   delete byoc;
 }
 
-JsonHandler* JsonWriter::BeginArray( const JsonFragment& name )
+JsnHandler* JsnWriter::BeginArray( const JsnFragment& name )
 {
   WriteProperty( name, "[" );
-  return new JsonWriter( *this );
+  return new JsnWriter( *this );
 }
 
-void JsonWriter::EndArray( JsonHandler* byoc )
+void JsnWriter::EndArray( JsnHandler* byoc )
 {
   WriteFragment( m_Style->m_NewlineString );
   WriteIndent();
@@ -533,24 +533,24 @@ void JsonWriter::EndArray( JsonHandler* byoc )
   delete byoc;
 }
 
-JsonWriter::Style::Style()
-: m_IndentLevelString( "  " )
+JsnWriter::Style::Style()
+: m_IndentLevel( "  " )
 , m_NewlineString( "\n" )
 , m_SpaceAfterColonString( " " )
 , m_EscapeUTF8( true )
 {}
 
-static JsonWriter::Style g_DefaultStyle;
+static JsnWriter::Style g_DefaultStyle;
 
 
-JsonWriter::JsonWriter( ByteStreamOut* stream, const Style* style )
+JsnWriter::JsnWriter( JsnStreamOut* stream, const Style* style )
 : m_Stream( stream )
 , m_Style( style ? style : &g_DefaultStyle )
 , m_IndentLevel( 0 )
 , m_ValueCount( 0 )
 {}
 
-JsonWriter::JsonWriter( const JsonWriter& other )
+JsnWriter::JsnWriter( const JsnWriter& other )
 : m_Stream( other.m_Stream )
 , m_Style( other.m_Style )
 , m_IndentLevel( other.m_IndentLevel + 1 )

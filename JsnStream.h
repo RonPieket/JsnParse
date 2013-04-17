@@ -30,28 +30,28 @@
 // *****************************************************************************************************
 // Section: simple in-memory read and write streams
 
-struct ByteStreamIn
+struct JsnStreamIn
 {
   const char* data;
   const char* error;
   int         index;
   int         index_end;
 
-  ByteStreamIn( const char* text )
+  JsnStreamIn( const char* text )
   : data      ( text )
   , error     ( NULL )
   , index     ( 0 )
   , index_end ( text ? ( int )strlen( text ) : 0 )
   {}
 
-  ByteStreamIn( const char* text, size_t text_length )
+  JsnStreamIn( const char* text, int text_length )
   : data      ( text )
   , error     ( NULL )
   , index     ( 0 )
   , index_end ( ( int )text_length )
   {}
 
-  ByteStreamIn( const char* text, const char* text_end )
+  JsnStreamIn( const char* text, const char* text_end )
   : data      ( text )
   , error     ( NULL )
   , index     ( 0 )
@@ -110,28 +110,28 @@ struct ByteStreamIn
 
 // -----------------------------------------------------------------------------------------------------
 
-struct ByteStreamOut
+struct JsnStreamOut
 {
   char*       data;
   const char* error;
   int         index;
   int         index_end;
 
-  ByteStreamOut( char* buf, size_t buf_size )
+  JsnStreamOut( char* buf, int buf_size )
   : data      ( buf )
   , error     ( NULL )
   , index     ( 0 )
-  , index_end ( ( int )buf_size )
+  , index_end ( buf_size )
   {}
 
-  ByteStreamOut()
+  JsnStreamOut()
   : data      ( NULL )
   , error     ( NULL )
   , index     ( 0 )
   , index_end ( 0 )
   {}
 
-  ByteStreamOut( char* buf, char* buf_end )
+  JsnStreamOut( char* buf, char* buf_end )
   : data      ( buf )
   , error     ( NULL )
   , index     ( 0 )

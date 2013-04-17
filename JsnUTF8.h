@@ -24,13 +24,13 @@
  */
 #pragma once
 
-#include "ByteStream.h"
+#include "JsnStream.h"
 
-void UnescapeUTF8( ByteStreamOut* write_stream, ByteStreamIn* read_stream );
-void EscapeUTF8( ByteStreamOut* write_stream, ByteStreamIn* read_stream );
+void JsnUnescapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream );
+void JsnEscapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream );
 
-int ReadEscapedUTF8Char( ByteStreamIn* stream );
-int ReadUnescapedUTF8Char( ByteStreamIn* stream );
+int JsnReadEscapedUTF8Char( JsnStreamIn* stream );
+int JsnReadUnescapedUTF8Char( JsnStreamIn* stream );
 
-void WriteEscapedUTF8Char( ByteStreamOut* stream, int codepoint );
-void WriteUnescapedUTF8Char( ByteStreamOut* stream, int codepoint );
+void JsnWriteEscapedUTF8Char( JsnStreamOut* stream, int codepoint );
+void JsnWriteUnescapedUTF8Char( JsnStreamOut* stream, int codepoint );
