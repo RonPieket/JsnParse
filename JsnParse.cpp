@@ -62,7 +62,7 @@ static void JsnEatSpace( JsnStreamIn* stream )
 static JsnFragment ParseString( JsnStreamIn* stream )
 {
   stream->Read(); // Skip leading quote
-  const char* begin = stream->data + stream->index;
+  const char* begin = stream->GetCurrent();
   int c = stream->Read();
   while( c != '"' )
   {
@@ -72,7 +72,7 @@ static JsnFragment ParseString( JsnStreamIn* stream )
     }
     c = stream->Read();
   }
-  const char* end = stream->data + stream->index - 1;
+  const char* end = stream->GetCurrent() - 1;
   return JsnFragment( kJsn_String, begin, end );
 }
 
@@ -92,7 +92,7 @@ static JsnFragment ParseNumber( JsnStreamIn* stream )
 {
   JsnType t = kJsn_Int;
 
-  const char* begin = stream->data + stream->index;
+  const char* begin = stream->GetCurrent();
   int c = stream->Read();
   if( c == '-' )
   {
@@ -128,7 +128,7 @@ static JsnFragment ParseNumber( JsnStreamIn* stream )
     }
   }
   stream->Unread();
-  const char* end = stream->data + stream->index;
+  const char* end = stream->GetCurrent();
 
   if( t == kJsn_Int )
   {
@@ -179,7 +179,7 @@ static void ParseTrue( JsnStreamIn* stream )
       stream->Read() != 'e'
     )
   {
-    stream->Error( "Syntax error" );
+    stream->SetError( "Syntax error" );
   }
 }
 
@@ -192,7 +192,7 @@ static void ParseFalse( JsnStreamIn* stream )
       stream->Read() != 'e'
     )
   {
-    stream->Error( "Syntax error" );
+    stream->SetError( "Syntax error" );
   }
 }
 
@@ -204,7 +204,7 @@ static void ParseNull( JsnStreamIn* stream )
       stream->Read() != 'l'
     )
   {
-    stream->Error( "Syntax error" );
+    stream->SetError( "Syntax error" );
   }
 }
 
@@ -226,7 +226,7 @@ static void ParseObject( JsnHandler* reader, JsnStreamIn* stream )
       }
       else
       {
-        stream->Error( "String expected" );
+        stream->SetError( "String expected" );
       }
 
       JsnEatSpace( stream );
@@ -239,17 +239,17 @@ static void ParseObject( JsnHandler* reader, JsnStreamIn* stream )
       }
       else
       {
-        stream->Error( "\":\" expected" );
+        stream->SetError( "\":\" expected" );
       }
       JsnEatSpace( stream );
     }
   }
-  while( !stream->error && stream->Peek() == ',' );
+  while( !stream->GetError() && stream->Peek() == ',' );
 
   if( stream->Read() != '}' )
   {
     stream->Unread();
-    stream->Error( "\"}\" expected" );
+    stream->SetError( "\"}\" expected" );
   }
 }
 
@@ -265,12 +265,12 @@ static void ParseArray( JsnHandler* reader, JsnStreamIn* stream )
       JsnEatSpace( stream );
     }
   }
-  while( !stream->error && stream->Peek() == ',' );
+  while( !stream->GetError() && stream->Peek() == ',' );
 
   if( stream->Read() != ']' )
   {
     stream->Unread();
-    stream->Error( "\"]\" expected" );
+    stream->SetError( "\"]\" expected" );
   }
 }
 
@@ -335,7 +335,7 @@ static void ParseValue( JsnHandler* reader, JsnStreamIn* stream, const JsnFragme
     }
 
     default:
-      stream->Error( "Unexpected character" );
+      stream->SetError( "Unexpected character" );
       break;
   }
 }
@@ -343,21 +343,21 @@ static void ParseValue( JsnHandler* reader, JsnStreamIn* stream, const JsnFragme
 bool JsnParse( JsnHandler* reader, JsnStreamIn* stream )
 {
   ParseValue( reader, stream, JsnFragment() );
-  return !stream->error;
+  return !stream->GetError();
 }
 
 static void WriteStringChar( JsnStreamOut* write_stream, JsnStreamIn* read_stream, bool escape )
 {
-  int codepoint1 = JsnReadUnescapedUTF8Char( read_stream );
+  int codepoint1 = JsnReadUTF8Char( read_stream );
 
-  if( read_stream->error )
+  if( read_stream->GetError() )
   {
     return;
   }
 
   if( codepoint1 == '\\' )
   {
-    int codepoint2 = JsnReadUnescapedUTF8Char( read_stream );
+    int codepoint2 = JsnReadUTF8Char( read_stream );
     switch( codepoint2 )
     {
       case '"':
@@ -424,7 +424,7 @@ static void WriteStringChar( JsnStreamOut* write_stream, JsnStreamIn* read_strea
 void JsnWriter::WriteFragment( const JsnFragment& fragment )
 {
   JsnStreamIn read_stream( fragment.m_Text, fragment.m_Length );
-  while( !m_Stream->error && read_stream.Peek() != -1 )
+  while( !m_Stream->GetError() && read_stream.Peek() != -1 )
   {
     m_Stream->Write( read_stream.Read() );
   }
@@ -434,7 +434,7 @@ void JsnWriter::WriteFragmentString( const JsnFragment& fragment )
 {
   JsnStreamIn read_stream( fragment.m_Text, fragment.m_Length );
   m_Stream->Write( '"' );
-  while( !read_stream.error && !m_Stream->error && read_stream.Peek() )
+  while( !read_stream.GetError() && !m_Stream->GetError() && read_stream.Peek() )
   {
     WriteStringChar( m_Stream, &read_stream, m_Style->m_EscapeUTF8 );
   }
@@ -445,7 +445,7 @@ void JsnWriter::WriteIndent()
 {
   for( int i = 0; i < m_IndentLevel; ++i )
   {
-    WriteFragment( m_Style->m_IndentLevel );
+    WriteFragment( m_Style->m_IndentString );
   }
 }
 
@@ -534,10 +534,10 @@ void JsnWriter::EndArray( JsnHandler* byoc )
 }
 
 JsnWriter::Style::Style()
-: m_IndentLevel( "  " )
+: m_IndentString( "  " )
 , m_NewlineString( "\n" )
 , m_SpaceAfterColonString( " " )
-, m_EscapeUTF8( true )
+, m_EscapeUTF8( false )
 {}
 
 static JsnWriter::Style g_DefaultStyle;

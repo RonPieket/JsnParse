@@ -23,8 +23,8 @@
  \author Ron Pieket \n<http://www.ItShouldJustWorkTM.com> \n<http://twitter.com/RonPieket>
  */
 
-#include "JsnStream.h"
 #include "JsnUTF8.h"
+#include "JsnStream.h"
 
 #include <stdint.h>
 
@@ -37,12 +37,12 @@ static int ReadEscapedUTF8Hex4( JsnStreamIn* stream )
   int c = stream->Read();
   if( c != '\\' )
   {
-    return stream->Error( "Expected '\\' character" );
+    return stream->SetError( "Expected '\\' character" );
   }
   c = stream->Read();
   if( c != 'u' && c != 'U' )
   {
-    return stream->Error( "Expected 'u' character" );
+    return stream->SetError( "Expected 'u' character" );
   }
   for( int i = 0; i < 4; ++i )
   {
@@ -61,7 +61,7 @@ static int ReadEscapedUTF8Hex4( JsnStreamIn* stream )
     }
     else
     {
-      return stream->Error( "Expected hex digit" );
+      return stream->SetError( "Expected hex digit" );
     }
     result = ( result << 4 ) + c;
   }
@@ -70,7 +70,7 @@ static int ReadEscapedUTF8Hex4( JsnStreamIn* stream )
 
 // -----------------------------------------------------------------------------------------------------
 
-int JsnReadEscapedUTF8Char( JsnStreamIn* stream )
+static int JsnReadEscapedUTF8Char( JsnStreamIn* stream )
 {
   int result = ReadEscapedUTF8Hex4( stream );
   if( result >= 0xD800 && result <= 0xDBFF )
@@ -87,16 +87,24 @@ int JsnReadEscapedUTF8Char( JsnStreamIn* stream )
 
 // -----------------------------------------------------------------------------------------------------
 
-int JsnReadUnescapedUTF8Char( JsnStreamIn* stream )
+int JsnReadUTF8Char( JsnStreamIn* stream )
 {
   int result = 0;
   int c = stream->Read();
-  if( !stream->error )
+  if( !stream->GetError() )
   {
     if( c <= 0x7f )
     {
       // 7 bits
-      result = c;
+      if( c == '\\' && ( stream->Peek() == 'u' || stream->Peek() == 'U' ) )
+      {
+        stream->Unread();
+        result = JsnReadEscapedUTF8Char( stream );
+      }
+      else
+      {
+        result = c;
+      }
     }
     else if( ( c & 0xe0 ) == 0xc0 )
     {
@@ -105,7 +113,7 @@ int JsnReadUnescapedUTF8Char( JsnStreamIn* stream )
       c = stream->Read();
       if( ( c & 0xc0 ) != 0x80 )
       {
-        return stream->Error( "Multi-byte sequence error" );
+        return stream->SetError( "Multi-byte sequence error" );
       }
       result = ( result << 6 ) | ( c & 0x3f );
     }
@@ -116,13 +124,13 @@ int JsnReadUnescapedUTF8Char( JsnStreamIn* stream )
       c = stream->Read();
       if( ( c & 0xc0 ) != 0x80 )
       {
-        return stream->Error( "Multi-byte sequence error" );
+        return stream->SetError( "Multi-byte sequence error" );
       }
       result = ( result << 6 ) | ( c & 0x3f );
       c = stream->Read();
       if( ( c & 0xc0 ) != 0x80 )
       {
-        return stream->Error( "Multi-byte sequence error" );
+        return stream->SetError( "Multi-byte sequence error" );
       }
       result = ( result << 6 ) | ( c & 0x3f );
     }
@@ -133,25 +141,25 @@ int JsnReadUnescapedUTF8Char( JsnStreamIn* stream )
       c = stream->Read();
       if( ( c & 0xc0 ) != 0x80 )
       {
-        return stream->Error( "Multi-byte sequence error" );
+        return stream->SetError( "Multi-byte sequence error" );
       }
       result = ( result << 6 ) | ( c & 0x3f );
       c = stream->Read();
       if( ( c & 0xc0 ) != 0x80 )
       {
-        return stream->Error( "Multi-byte sequence error" );
+        return stream->SetError( "Multi-byte sequence error" );
       }
       result = ( result << 6 ) | ( c & 0x3f );
       c = stream->Read();
       if( ( c & 0xc0 ) != 0x80 )
       {
-        return stream->Error( "Multi-byte sequence error" );
+        return stream->SetError( "Multi-byte sequence error" );
       }
       result = ( result << 6 ) | ( c & 0x3f );
     }
     else
     {
-      return stream->Error( "Multi-byte sequence error" );
+      return stream->SetError( "Multi-byte sequence error" );
     }
   }
   return result;
@@ -224,20 +232,10 @@ void JsnWriteUnescapedUTF8Char( JsnStreamOut* stream, int codepoint )
 
 void JsnUnescapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream )
 {
-  while( !read_stream->error && !write_stream->error && read_stream->Peek() )
+  while( !read_stream->GetError() && !write_stream->GetError() && read_stream->Peek() )
   {
-    int codepoint = 0;
-    int c0 = read_stream->Peek( 0 );
-    int c1 = read_stream->Peek( 1 );
-    if( c0 == '\\' && ( c1 == 'u' || c1 == 'U' ) )
-    {
-      codepoint = JsnReadEscapedUTF8Char( read_stream );
-    }
-    else
-    {
-      codepoint = read_stream->Read();
-    }
-    if( !read_stream->error )
+    int codepoint = JsnReadUTF8Char( read_stream );
+    if( !read_stream->GetError() )
     {
       JsnWriteUnescapedUTF8Char( write_stream, codepoint );
     }
@@ -249,10 +247,10 @@ void JsnUnescapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream )
 
 void JsnEscapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream )
 {
-  while( !read_stream->error && !write_stream->error && read_stream->Peek() )
+  while( !read_stream->GetError() && !write_stream->GetError() && read_stream->Peek() )
   {
-    int codepoint = JsnReadUnescapedUTF8Char( read_stream );
-    if( !read_stream->error )
+    int codepoint = JsnReadUTF8Char( read_stream );
+    if( !read_stream->GetError() )
     {
       if( codepoint < 0x80 )
       {

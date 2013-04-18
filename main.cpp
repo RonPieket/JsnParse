@@ -137,14 +137,14 @@ void JsnExample::Value::Write( JsnHandler* writer ) const
     case kJsn_Int:
     {
       char buf[ 25 ];
-      writer->AddProperty( m_Name, JsnFragment().FromInt( buf, sizeof( buf ), m_Value.i ) );
+      writer->AddProperty( m_Name, JsnFragment::FromInt( buf, sizeof( buf ), m_Value.i ) );
       break;
     }
 
     case kJsn_Float:
     {
       char buf[ 25 ];
-      writer->AddProperty( m_Name, JsnFragment().FromFloat( buf, sizeof( buf ), m_Value.f ) );
+      writer->AddProperty( m_Name, JsnFragment::FromFloat( buf, sizeof( buf ), m_Value.f ) );
       break;
     }
 
@@ -221,12 +221,6 @@ JsnExample::Value::~Value()
 
 char json_text[] =
   "{" \
-  " \"ctrl_chars\": \" \\\" \\\\ \\/ \\b \\f \\n \\r \\t \"," \
-  " \"escaped_ctrl_chars\": \" \\\\/ \\\\b \\\\f \\\\n \\\\r \\\\t \"," \
-  " \"bogus_ctrl_chars\": \" \\x \\y \\z \"," \
-  " \"escaped_bogus_ctrl_chars\": \" \\\\x \\\\y \\\\z \"," \
-  " \"unicode_escaped\": \"Copyright:\\u00A9 Notes:\\u266B Clef:\\uD834\\uDD1E\"," \
-  " \"unicode_unescaped\": \"Copyright:© Notes:♫ Clef:𝄞\"," \
   " \"string\": \"hello\"," \
   " \"int\": 100," \
   " \"float\": 3.141592," \
@@ -234,6 +228,12 @@ char json_text[] =
   " \"bool\": true," \
   " \"object\": { \"first\": \"Jane\", \"last\": \"Austen\" }," \
   " \"empty_object\": {}," \
+  " \"ctrl_chars\": \" \\\" \\\\ \\/ \\b \\f \\n \\r \\t \"," \
+  " \"escaped_ctrl_chars\": \" \\\\/ \\\\b \\\\f \\\\n \\\\r \\\\t \"," \
+  " \"illegal_ctrl_chars\": \" \\x \\y \\z \"," \
+  " \"escaped_illegal_ctrl_chars\": \" \\\\x \\\\y \\\\z \"," \
+  " \"unicode_escaped\": \"Copyright:\\u00A9 Notes:\\u266B Clef:\\uD834\\uDD1E\"," \
+  " \"unicode_unescaped\": \"Copyright:© Notes:♫ Clef:𝄞\"," \
   " \"array_of_string\": [ \"first\", \"second\" ]," \
   " \"array_of_number\": [ 100, 200, 300 ]," \
   " \"array_of_bool\": [ false, true ]," \
@@ -254,27 +254,21 @@ int main(int argc, const char * argv[])
   JsnStreamIn read_stream( json_text );
   if( !JsnParse( &example_reader, &read_stream ) )
   {
-    printf( "ERROR: %s\n", read_stream.error );
+    printf( "ERROR: %s\n", read_stream.GetError() );
     char buf[ 50 ];
     int len = sizeof( buf );
-    strncpy( buf, read_stream.data + read_stream.index, len );
+    strncpy( buf, read_stream.GetCurrent(), len );
     buf[ len - 1 ] = 0;
     printf( "%s\n", buf );
   }
   else
   {
     JsnStreamOut write_stream;
-    JsnWriter::Style style;
-    style.m_EscapeUTF8 = false;
-    style.m_IndentLevel = "";
-    style.m_NewlineString = "";
-    style.m_SpaceAfterColonString = "";
 
-    JsnWriter writer( &write_stream, &style );
+    JsnWriter writer( &write_stream, NULL );
     example_reader.GetValue()->Write( &writer );
 
-    int count = write_stream.index;
-    printf( "COUNT %d\n", ( int )count );
+    int count = write_stream.GetCount();
     char* buffer = new char[ count + 1 ]; // +1 for zero termination
     buffer[ count ] = '\0';
     write_stream = JsnStreamOut( buffer, count );

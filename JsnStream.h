@@ -27,16 +27,36 @@
 #include <string.h>
 #include <stdint.h>
 
-// *****************************************************************************************************
-// Section: simple in-memory read and write streams
-
-struct JsnStreamIn
+/*******************************************************************************************************
+ \class JsnStreamIn
+ Simple in-memory byte stream reader.
+ */
+class JsnStreamIn
 {
-  const char* data;
-  const char* error;
-  int         index;
-  int         index_end;
+public:
 
+  /**
+   Return error string.
+   \return Error string, or NULL if no error.
+   */
+  const char* GetError() const { return error; }
+
+  /**
+   Get pointer to current data being read.
+   \return Pointer to data currently being read.
+   */
+  const char* GetCurrent() const { return data + index; }
+
+  /**
+   Return number of characters read.
+   \return Number of characters read.
+   */
+  int GetCount() const { return index; }
+
+  /**
+   Construct from zero terminated string.
+   \param[ in ] text Zero terminated string.
+   */
   JsnStreamIn( const char* text )
   : data      ( text )
   , error     ( NULL )
@@ -44,6 +64,11 @@ struct JsnStreamIn
   , index_end ( text ? ( int )strlen( text ) : 0 )
   {}
 
+  /**
+   Construct from text, not necessarily zero terminated.
+   \param[ in ] text Start of text.
+   \param[ in ] text_length Length of text.
+   */
   JsnStreamIn( const char* text, int text_length )
   : data      ( text )
   , error     ( NULL )
@@ -51,6 +76,11 @@ struct JsnStreamIn
   , index_end ( ( int )text_length )
   {}
 
+  /**
+   Construct from text, not necessarily zero terminated.
+   \param[ int ] text Start of text.
+   \param[ int ] text_length End of text.
+   */
   JsnStreamIn( const char* text, const char* text_end )
   : data      ( text )
   , error     ( NULL )
@@ -58,12 +88,19 @@ struct JsnStreamIn
   , index_end ( ( int )( text_end - text ) )
   {}
 
+  /**
+   Move read position to the beginning of the data.
+   */
   void Reset()
   {
     index = 0;
     error = NULL;
   }
 
+  /**
+   Read next character.
+   \return The read character, or -1 if an error occurred (either during this read operation or previously)
+   */
   int Read()
   {
     if( !error )
@@ -75,12 +112,15 @@ struct JsnStreamIn
       }
       else
       {
-        error = "Unexpected end of input data";
+        SetError( "Unexpected end of input data" );
       }
     }
     return -1;
   }
 
+  /**
+   Move read position back by one position.
+   */
   void Unread()
   {
     if( !error && index )
@@ -89,6 +129,10 @@ struct JsnStreamIn
     }
   }
 
+  /**
+   Read next character without moving read position.
+   \return The read character, or -1 if an error occurred (either during this read operation or previously)
+   */
   int Peek( int offset = 0 ) const
   {
     if( error || index + offset >= index_end )
@@ -98,7 +142,11 @@ struct JsnStreamIn
     return ( uint8_t )data[ index + offset ];
   }
 
-  int Error( const char* msg )
+  /**
+   Set error string.
+   \return Always zero.
+   */
+  int SetError( const char* msg )
   {
     if( !error )
     {
@@ -106,16 +154,38 @@ struct JsnStreamIn
     }
     return 0;
   }
+
+private:
+  const char* data;
+  const char* error;
+  int         index;
+  int         index_end;
 };
 
-// -----------------------------------------------------------------------------------------------------
-
-struct JsnStreamOut
+/*******************************************************************************************************
+ \class JsnStreamOut
+ Simple in-memory byte stream writer.
+ */
+class JsnStreamOut
 {
+private:
   char*       data;
   const char* error;
   int         index;
   int         index_end;
+public:
+
+  /**
+   Return error string.
+   \return Error string, or NULL if no error.
+   */
+  const char* GetError() const { return error; }
+
+  /**
+   Return number of characters written.
+   \return Number of characters written.
+   */
+  int GetCount() const { return index; }
 
   JsnStreamOut( char* buf, int buf_size )
   : data      ( buf )
@@ -138,12 +208,19 @@ struct JsnStreamOut
   , index_end ( ( int )( buf_end - buf ) )
   {}
 
+  /**
+   Move read position to the beginning of the data.
+   */
   void Reset()
   {
     index = 0;
     error = NULL;
   }
 
+  /**
+   Write character to output data.
+   \param[ in ] c Character to write.
+   */
   void Write( int c )
   {
     if( !error )
@@ -154,11 +231,11 @@ struct JsnStreamOut
       }
       else if( c == -1 )
       {
-        error = "Writing end-of-data marker";
+        SetError( "Writing end-of-data marker" );
       }
       else if( index >= index_end )
       {
-        error = "Out of room in output buffer";
+        SetError( "Out of room in output buffer" );
       }
       else
       {
@@ -167,6 +244,10 @@ struct JsnStreamOut
     }
   }
 
+  /**
+   Write multiple characters to output data.
+   \param[ in ] text Zero terminated string to write. (Terminator will not be written)
+   */
   void WriteStr( const char* text )
   {
     while( char c = *text++ )
@@ -175,7 +256,11 @@ struct JsnStreamOut
     }
   }
 
-  int Error( const char* msg )
+  /**
+   Set error string.
+   \return Always zero.
+   */
+  int SetError( const char* msg )
   {
     if( !error )
     {
