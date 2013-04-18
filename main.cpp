@@ -34,37 +34,37 @@
 
 class JsnExample final : public JsnHandler
 {
-  struct Value
+  struct Node
   {
-    Value( const JsnFragment& name, const JsnFragment& value );
-    ~Value();
+    Node( const JsnFragment& name, const JsnFragment& value );
+    ~Node();
 
-    const char* m_Name;
     union
     {
       const char* s;
       double      f;
       int64_t     i;
-    }             m_Value;
-    Value*        m_Next;
-    Value*        m_Child;
-    JsnType       m_Type;
+    }           m_Value;
+    const char* m_Name;
+    Node*       m_Next;
+    Node*       m_Child;
+    JsnType     m_Type;
 
     void Write( JsnHandler* writer ) const;
   };
 
-  Value* m_Value;
-  Value* m_LastChild;
+  Node* m_Node;
+  Node* m_LastChild;
 
 public:
 
-  JsnExample( Value* parent_value = NULL )
+  JsnExample( Node* parent_value = NULL )
   {
-    m_Value = parent_value;
+    m_Node = parent_value;
     m_LastChild = NULL;
   }
 
-  Value* GetValue()
+  Node* GetNode()
   {
     return m_LastChild;
   }
@@ -101,18 +101,18 @@ private:
 
   void Add( const JsnFragment& name, const JsnFragment& value )
   {
-    Add( new JsnExample::Value( name, value ) );
+    Add( new JsnExample::Node( name, value ) );
   }
 
-  void Add( JsnExample::Value* value )
+  void Add( JsnExample::Node* value )
   {
     if( m_LastChild )
     {
       m_LastChild->m_Next = value;
     }
-    else if( m_Value )
+    else if( m_Node )
     {
-      m_Value->m_Child = value;
+      m_Node->m_Child = value;
     }
     m_LastChild = value;
   }
@@ -120,7 +120,7 @@ private:
 
 // -----------------------------------------------------------------------------------------------------
 
-void JsnExample::Value::Write( JsnHandler* writer ) const
+void JsnExample::Node::Write( JsnHandler* writer ) const
 {
   switch( m_Type )
   {
@@ -151,7 +151,7 @@ void JsnExample::Value::Write( JsnHandler* writer ) const
     case kJsn_Object:
     {
       JsnHandler* child_writer = writer->BeginObject( m_Name );
-      for( JsnExample::Value* child = m_Child; child; child = child->m_Next )
+      for( JsnExample::Node* child = m_Child; child; child = child->m_Next )
       {
         child->Write( child_writer );
       }
@@ -162,7 +162,7 @@ void JsnExample::Value::Write( JsnHandler* writer ) const
     case kJsn_Array:
     {
       JsnHandler* child_writer = writer->BeginArray( m_Name );
-      for( JsnExample::Value* child = m_Child; child; child = child->m_Next )
+      for( JsnExample::Node* child = m_Child; child; child = child->m_Next )
       {
         child->Write( child_writer );
       }
@@ -188,7 +188,7 @@ static const char* NewCString( const JsnFragment& fragment )
   return s;
 }
 
-JsnExample::Value::Value( const JsnFragment& name, const JsnFragment& value )
+JsnExample::Node::Node( const JsnFragment& name, const JsnFragment& value )
 {
   m_Next = NULL;
   m_Child = NULL;
@@ -208,7 +208,7 @@ JsnExample::Value::Value( const JsnFragment& name, const JsnFragment& value )
   }
 }
 
-JsnExample::Value::~Value()
+JsnExample::Node::~Node()
 {
   delete[] m_Name;
   if( m_Type != kJsn_Int && m_Type != kJsn_Float )
@@ -266,13 +266,13 @@ int main(int argc, const char * argv[])
     JsnStreamOut write_stream;
 
     JsnWriter writer( &write_stream, NULL );
-    example_reader.GetValue()->Write( &writer );
+    example_reader.GetNode()->Write( &writer );
 
     int count = write_stream.GetCount();
     char* buffer = new char[ count + 1 ]; // +1 for zero termination
     buffer[ count ] = '\0';
     write_stream = JsnStreamOut( buffer, count );
-    example_reader.GetValue()->Write( &writer );
+    example_reader.GetNode()->Write( &writer );
     printf( "%s\n", buffer );
     delete[] buffer;
   }
