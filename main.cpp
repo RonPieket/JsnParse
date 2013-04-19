@@ -282,12 +282,6 @@ int main(int argc, const char * argv[])
     printf( "%s\n", buffer );
     delete[] buffer;
   }
-/*
-  printf( "\n\n--------- read directly into writer (for fun, because we can)\n\n" );
-  writer.SetModePrint();
-  read_stream.Reset();
-  JsnParse( &writer, &read_stream );
- */
 
   return 0;
 }
