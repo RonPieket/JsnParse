@@ -29,11 +29,9 @@
 #include <string.h>
 #include <stdint.h>
 
-// *****************************************************************************************************
-// Section: JsnHandler
-
-/**
+/************************************************************************************************************/ /**
  \enum JsnType
+ Identify type of JsnFragment.
  */
 enum JsnType
 {
@@ -41,20 +39,20 @@ enum JsnType
                    when AddProperty is called with an array element, the name fragment will be of type
                    kJsn_Undefined, because array elements are not named. Also (ab)used for brackets,
                    commas, spaces etc. */
-  kJsn_Null,      /**< JSON value null */
-  kJsn_False,     /**< JSON value false */
-  kJsn_True,      /**< JSON value true */
-  kJsn_Int,       /**< JSON number of integer sub type */
-  kJsn_Float,     /**< JSON number of float sub type. Used if decimal point or exponent is detected, or
-                   if number is too large to fit in a 64-bit signed integer */
-  kJsn_String,    /**< JSON string */
-  kJsn_Object,    /**< JSON object */
-  kJsn_Array      /**< JSON array */
+  kJsn_Null,      /**< JSON type null */
+  kJsn_False,     /**< JSON type boolean value false */
+  kJsn_True,      /**< JSON type boolean value true */
+  kJsn_Int,       /**< JSON type number subtype integer */
+  kJsn_Float,     /**< JSON type number subtype float */
+  kJsn_String,    /**< JSON type string */
+  kJsn_Object,    /**< JSON type object */
+  kJsn_Array      /**< JSON type array */
 };
 
 /**
  \struct JsnFragment
- Represents a text fragment of the input JSON text. Note that the fragment text is NOT a zero-terminated string.
+ Represents a text fragment of the input JSON text. Note that the fragment text is NOT a zero-terminated
+ string.
  */
 struct JsnFragment
 {
@@ -62,31 +60,66 @@ struct JsnFragment
   int         m_Length; /**< Length of the fragment text */
   JsnType     m_Type;   /**< Type of the fragment */
 
+  /**
+   Construct from text and length.
+   \param[ in ] t Type
+   \param[ in ] text Start of text, not necessarily zero terminated
+   \param[ in ] length Length of text string
+   */
   JsnFragment( JsnType t, const char* text, int length )
   : m_Text( text )
   , m_Length( length )
   , m_Type( t )
   {}
+
+  /**
+   Construct from text start and end pointer.
+   \param[ in ] t Type
+   \param[ in ] text Start of text, not necessarily zero terminated
+   \param[ in ] end End of text string
+   */
   JsnFragment( JsnType t, const char* text, const char* end )
   : m_Text( text )
   , m_Length( ( int )( end - text ) )
   , m_Type( t )
   {}
+
+  /**
+   Construct from zero terminated text string.
+   \param[ in ] t Type
+   \param[ in ] text Start of zero terminated text string
+   */
   JsnFragment( JsnType t, const char* text )
   : m_Text( text )
   , m_Length( text ? ( int )strlen( text ) : 0 )
   , m_Type( t )
   {}
+
+  /**
+   Construct from zero terminated text string. Type will be undefined. This is used for helper strings,
+   such as spaces and commas.
+   \param[ in ] text Start of zero terminated text string
+   */
   JsnFragment( const char* text )
   : m_Text( text )
   , m_Length( text ? ( int )strlen( text ) : 0 )
   , m_Type( kJsn_Undefined )
   {}
+
+  /**
+   Copy constructor.
+   \param[ in ] other JsnFragment to copy
+   */
   JsnFragment( const JsnFragment& other )
   : m_Text( other.m_Text )
   , m_Length( other.m_Length )
   , m_Type( other.m_Type )
   {}
+
+  /**
+   Default constructor.
+   \param[ in ] t Type
+   */
   JsnFragment( JsnType t = kJsn_Undefined )
   : m_Text( NULL )
   , m_Length( 0 )
@@ -101,12 +134,20 @@ struct JsnFragment
    Interpret fragment as integer using `atod()`
    */
   int64_t AsInt() const;
+
+  /**
+   Assignment from string.
+   */
   JsnFragment& operator=( const char* text )
   {
     m_Text    = text;
     m_Length  = text ? ( int )strlen( text ) : 0;
     return *this;
   }
+
+  /**
+   Assignment from another JsnFragment.
+   */
   JsnFragment& operator= ( const JsnFragment& rhs )
   {
     m_Text    = rhs.m_Text;
@@ -114,28 +155,29 @@ struct JsnFragment
     m_Type    = rhs.m_Type;
     return *this;
   }
+
   /**
    Build from a double precision float.
-   \param[ in ] buf25 Buffer to write the text to. Note that this buffer must be managed by the caller, and
-   remain valid for the life span of the object.
+   \param[ in ] buf25 Buffer to write the text to. Note that this buffer must be managed by the caller,
+   and remain valid for the life span of the object.
    \param[ in ] buf_size Size of buffer. Must be at least 25 bytes.
    \param[ in ] value The value to be represented.
+   \return Fragment
    */
   static JsnFragment FromFloat( char* buf25, int buf_size, double value );
 
   /**
    Build from an integer.
-   \param[ in ] buf25 Buffer to write the text to. Note that this buffer must be managed by the caller, and
-   remain valid for the life span of the object.
+   \param[ in ] buf25 Buffer to write the text to. Note that this buffer must be managed by the caller,
+   and remain valid for the life span of the object.
    \param[ in ] buf_size Size of buffer. Must be at least 25 bytes.
    \param[ in ] value The value to be represented.
+   \return Fragment
    */
   static JsnFragment FromInt( char* buf25, int buf_size, int64_t value );
 };
 
-// -----------------------------------------------------------------------------------------------------
-
-/**
+/************************************************************************************************************/ /**
  \interface JsnHandler
  Abstract interface for receiving the JSON text in a piecemeal fashion. A JsnHandler instance is
  responsible for building one object or array. It will be passed properties through AddProperty(),
@@ -180,10 +222,8 @@ public:
   virtual ~JsnHandler() {}
 };
 
-// -----------------------------------------------------------------------------------------------------
-
-/**
- \class JsonWriter
+/************************************************************************************************************/ /**
+ \class JsnWriter
  Used to format your data in valid JSON. Implements JsnHandler. You are expected to iterate through your
  data and call the JsnWriter members in more or less the same order as it was built (or would build it)
  with JsnHandler. See proveded example code JsnExample::Value::Write().
@@ -207,11 +247,16 @@ public:
                                            compactness.*/
     bool         m_EscapeUTF8;    /**< Flag to force UTF-8 characters to be escaped. If false, UTF-8
                                    will be written to the output. If true, all UTF-8 characters will be
-                                   replaced with their \uXXXX equivalent */
+                                   replaced with their \\uXXXX equivalent */
 
     Style();
   };
 
+  /**
+   Construct JsnWriter with an input stream, and optional style.
+   \param[ in ] stream Output stream.
+   \param[ in ] style Settings that control details of the the output format.
+   */
   JsnWriter( JsnStreamOut* stream, const Style* style = NULL );
 
   virtual void        AddProperty( const JsnFragment& name, const JsnFragment& value ) override;
@@ -234,9 +279,7 @@ private:
   void WriteProperty( const JsnFragment& name, const JsnFragment& value );
 };
 
-// -----------------------------------------------------------------------------------------------------
-
-/**
+/************************************************************************************************************/ /**
  Parse the input stream, call members of the handler implementation as elements in teh text are
  detected.
  */

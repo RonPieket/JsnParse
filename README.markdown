@@ -1,12 +1,36 @@
-Really? Another JSON library?
-=============================
+Bring-Your-Own-Container JSON Parser for C++
+============================================
 
-Yup, and here is why: all other JSON libraries either use STL, their own internal container classes, or a combination of both. But I don't want to use use STL and I already have my own container classes. Well then, here's JsonByoc - bring your own container.
+Most (perhaps all) C++ JSON libraries either use STL or their own internal container classes. But what if you don't want to use use STL and you already have your own container classes? That's JsnParse.
 
-Of course there is some work involved to connect JsonByoc to your containers. I hope I made it easy enough, and there is a fully functional example in main.cpp.
+JsnParse will parse any valid JSON text, and feed the text in handy little snippets to your code, so your code can build the data using your own containers.
 
-The idea is that you provide an implementation of an abstract interface. There are five methods to implement: an AddProperty get called for each name/value pair, a BeginObject/EndObject combo, same again for BeginArray/EndArray. (Actually, there is a sixth on: an error handler. I lied)
+For example, if this is the JSON text:
 
-JsonByoc will parse the input text, and feed the text in handy little snippets to your code. You then put them into your own hash table, linked list or tree container.
+```json
+{
+  "make": "Bugatti",
+  "model": "Veyron",
+  "specs": {
+    "cylinders": 16,
+    "mph": 253
+  }
+}
+```
 
-And JsonByoc works backwards as well. If you can enumerate the data in your containers and call AddProperty, BeginObject/EndObject and BeginArray/EndArray, JsonByoc will put it together into valid JSON.
+When parsing the above text, your code will receive callbacks along the lines of:
+
+```
+AddString( "make", "Bugatti" );
+AddString( "model", "Veyron" );
+BeginObject( "specs" );
+AddNumber( "cylinders", 16 );
+AddNumber( "mph", 253 );
+EndObject(); 
+```
+
+The precise code looks a little different, but that's more or less what is going on.
+
+Also, JsnParse contains the essentials to write data from your own classes into valid JSON text, with or without pretty printing, in escaped or unescaped UTF-8 formats.
+
+There is a fully functional example in main.cpp.

@@ -28,8 +28,7 @@
 
 #include <stdint.h>
 
-// *****************************************************************************************************
-// Section: read individual unicode characters
+/****************************************************************************************************************/
 
 static int ReadEscapedUTF8Hex4( JsnStreamIn* stream )
 {
@@ -68,7 +67,7 @@ static int ReadEscapedUTF8Hex4( JsnStreamIn* stream )
   return result;
 }
 
-// -----------------------------------------------------------------------------------------------------
+/****************************************************************************************************************/
 
 static int JsnReadEscapedUTF8Char( JsnStreamIn* stream )
 {
@@ -85,7 +84,7 @@ static int JsnReadEscapedUTF8Char( JsnStreamIn* stream )
   return result;
 }
 
-// -----------------------------------------------------------------------------------------------------
+/****************************************************************************************************************/
 
 int JsnReadUTF8Char( JsnStreamIn* stream )
 {
@@ -165,8 +164,7 @@ int JsnReadUTF8Char( JsnStreamIn* stream )
   return result;
 }
 
-// *****************************************************************************************************
-// Section: write individual unicode characters
+/****************************************************************************************************************/
 
 static void WriteEscapedUTF8Hex4( JsnStreamOut* stream, int code16 )
 {
@@ -179,7 +177,7 @@ static void WriteEscapedUTF8Hex4( JsnStreamOut* stream, int code16 )
   }
 }
 
-// -----------------------------------------------------------------------------------------------------
+/****************************************************************************************************************/
 
 void JsnWriteEscapedUTF8Char( JsnStreamOut* stream, int codepoint )
 {
@@ -195,7 +193,7 @@ void JsnWriteEscapedUTF8Char( JsnStreamOut* stream, int codepoint )
   }
 }
 
-// -----------------------------------------------------------------------------------------------------
+/****************************************************************************************************************/
 
 void JsnWriteUnescapedUTF8Char( JsnStreamOut* stream, int codepoint )
 {
@@ -227,8 +225,7 @@ void JsnWriteUnescapedUTF8Char( JsnStreamOut* stream, int codepoint )
   }
 }
 
-// *****************************************************************************************************
-// Section: converting strings
+/****************************************************************************************************************/
 
 void JsnUnescapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream )
 {
@@ -243,7 +240,7 @@ void JsnUnescapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream )
   write_stream->Write( 0 );
 }
 
-// -----------------------------------------------------------------------------------------------------
+/****************************************************************************************************************/
 
 void JsnEscapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream )
 {
@@ -265,4 +262,4 @@ void JsnEscapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream )
   write_stream->Write( 0 );
 }
 
-// *****************************************************************************************************
+/****************************************************************************************************************/

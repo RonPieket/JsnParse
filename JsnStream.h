@@ -27,7 +27,7 @@
 #include <string.h>
 #include <stdint.h>
 
-/*******************************************************************************************************
+/************************************************************************************************************/ /**
  \class JsnStreamIn
  Simple in-memory byte stream reader.
  */
@@ -78,8 +78,8 @@ public:
 
   /**
    Construct from text, not necessarily zero terminated.
-   \param[ int ] text Start of text.
-   \param[ int ] text_length End of text.
+   \param[ in ] text Start of text.
+   \param[ in ] text_end End of text.
    */
   JsnStreamIn( const char* text, const char* text_end )
   : data      ( text )
@@ -131,6 +131,7 @@ public:
 
   /**
    Read next character without moving read position.
+   \param[ in ] offset Offset from read position.
    \return The read character, or -1 if an error occurred (either during this read operation or previously)
    */
   int Peek( int offset = 0 ) const
@@ -144,6 +145,7 @@ public:
 
   /**
    Set error string.
+   \param[ in ] msg Error message.
    \return Always zero.
    */
   int SetError( const char* msg )
@@ -162,7 +164,7 @@ private:
   int         index_end;
 };
 
-/*******************************************************************************************************
+/************************************************************************************************************/ /**
  \class JsnStreamOut
  Simple in-memory byte stream writer.
  */
@@ -187,6 +189,11 @@ public:
    */
   int GetCount() const { return index; }
 
+  /**
+   Construct from buffer address and size.
+   \param[ in ] buf Buffer
+   \param[ in ] buf_size Buffer size
+   */
   JsnStreamOut( char* buf, int buf_size )
   : data      ( buf )
   , error     ( NULL )
@@ -194,6 +201,9 @@ public:
   , index_end ( buf_size )
   {}
 
+  /**
+   Default constructor.
+   */
   JsnStreamOut()
   : data      ( NULL )
   , error     ( NULL )
@@ -201,6 +211,11 @@ public:
   , index_end ( 0 )
   {}
 
+  /**
+   Construct from buffer start and end.
+   \param[ in ] buf Buffer start.
+   \param[ in ] buf_end Buffer end.
+   */
   JsnStreamOut( char* buf, char* buf_end )
   : data      ( buf )
   , error     ( NULL )
@@ -258,6 +273,7 @@ public:
 
   /**
    Set error string.
+   \param[ in ] msg Error message.
    \return Always zero.
    */
   int SetError( const char* msg )
@@ -270,4 +286,4 @@ public:
   }
 };
 
-// *****************************************************************************************************
+/****************************************************************************************************************/

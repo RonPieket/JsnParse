@@ -27,17 +27,17 @@
 struct JsnStreamIn;
 struct JsnStreamOut;
 
-/**
+/************************************************************************************************************/ /**
  Read input stream, convert to multi-byte sequences where necessary, and write result to output stream.
  */
 void JsnUnescapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream );
 
-/**
+/************************************************************************************************************/ /**
  Read input stream, apply "\uXXXX" escaping where necessary, and write result to output stream.
  */
 void JsnEscapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream );
 
-/**
+/************************************************************************************************************/ /**
  Read a single (possibly multi-byte or escaped) codepoint from the input stream. Will recognize UTF-8 bit
  pattern, or "\uXXXX" escape code and convert accordingly.
  \param[ in ] stream Input stream
@@ -45,14 +45,14 @@ void JsnEscapeUTF8( JsnStreamOut* write_stream, JsnStreamIn* read_stream );
  */
 int JsnReadUTF8Char( JsnStreamIn* stream );
 
-/**
+/************************************************************************************************************/ /**
  Write single codepoint to output stream with "\uXXXX" escaping if necessary.
  \param[ in ] codepoint Codepoint to write
  \param[ in ] stream Output stream to write to
  */
 void JsnWriteEscapedUTF8Char( JsnStreamOut* stream, int codepoint );
 
-/**
+/************************************************************************************************************/ /**
  Write a single codepoint to output stream, making it a multi-byte sequence if necessary.
  \param[ in ] codepoint Codepoint to write
  \param[ in ] stream Output stream to write to
