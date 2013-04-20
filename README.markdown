@@ -18,18 +18,18 @@ For example, if this is the JSON text:
 }
 ```
 
-When parsing the above text, your code will receive callbacks along the lines of:
+When parsing the above text, your code will receive callbacks along the lines of the following *pseudo-code:*
 
 ```
+BeingObject();
 AddString( "make", "Bugatti" );
 AddString( "model", "Veyron" );
 BeginObject( "specs" );
 AddNumber( "cylinders", 16 );
 AddNumber( "mph", 253 );
-EndObject(); 
+EndObject();
+EndObject();
 ```
-
-The precise code looks a little different, but that's more or less what is going on.
 
 Also, JsnParse contains the essentials to write data from your own classes into valid JSON text, with or without pretty printing, in escaped or unescaped UTF-8 formats.
 
