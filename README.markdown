@@ -3,7 +3,7 @@ Bring-Your-Own-Container JSON Parser for C++
 
 Most (perhaps all) C++ JSON libraries either use STL or their own internal container classes. But what if you don't want to use use STL and you already have your own container classes? That's JsnParse.
 
-JsnParse will parse any valid JSON text, and feed the text in handy little snippets to your code, so your code can build the data using your own containers.
+JsnParse will parse any UTF-8 JSON text, and feed the text in handy little snippets to your code, so your code can build the data using your own containers.
 
 For example, if this is the JSON text:
 
